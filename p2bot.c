@@ -25,11 +25,8 @@ int main(int argc, char *argv[])
     }
     argc -= optind;
     argv += optind;
-    int i;
-    for (i = 0; i < 10; i++) {
-        save_url(argv[0], argv[1], argv[2]);
-        usleep(500000);
-    }
+    save_url(argv[0], argv[1], argv[2]);
+    //usleep(500000);
     return 0;
 }
 
