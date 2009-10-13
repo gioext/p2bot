@@ -8,33 +8,40 @@ typedef struct {
     char *path;
 } url_t;
 
-url_t *searchURL(char **body);
+url_t *getURL(char **body);
 
-url_t *searchURL(char **body)
+url_t *getURL(char **body)
 {
     url_t *url;
-    char ch, *chs;
+    char ch, *cs, *ce, *cp;
+    cs = *body;
 
-    /* search '//' */
-    while((chs = strstr(*body, "//")) != NULL) {
-        chs += 2;
-        *body = chs;
+    /* search url */
+    while((ce = strstr(cs, "//")) != NULL) {
+        ce += 2;
+        cs = ce;
 
-        ch = *chs;
+        ch = *ce;
         while (isalnum(ch) || strchr(".?/", ch) != NULL) {
-            ch = *(++chs);
+            ch = *(++ce);
         }
-        *chs = '\0';
+        *ce = '\0';
 
         // valid
+        if (strchr(cs, '/') == NULL || strstr(cs, ".jpg") == NULL) {
+//            fprintf(stderr, "%s\n", cs);
+            continue;
+        }
+        
+        cp = strchr(cs, '/');
         
         url = malloc(sizeof(url_t));
-        url->host = malloc(strlen(*body) + 1);
-        strcpy(url->host, *body);
-        url->path = malloc(strlen(*body) + 1);
-        strcpy(url->path, *body);
+        url->host = malloc(cp - cs + 1);
+        strncpy(url->host, cs, cp - cs);
+        url->path = malloc(strlen(cp) + 1);
+        strcpy(url->path, cp);
 
-        *body = ++chs;
+        *body = ce + 1;
         return url;
     }
     return NULL;
@@ -53,10 +60,8 @@ int main(int argc, char *argv[])
 
     while (fgets(buf, sizeof(buf), fp) != NULL) {
         bufp = buf;
-        while ((url = searchURL(&bufp)) != NULL) {
-            printf("Host: %s\n", url->host);
-            printf("Path: %s\n", url->path);
-            puts("");
+        while ((url = getURL(&bufp)) != NULL) {
+            fprintf(stdout, "Host: %s, Path: %s\n", url->host, url->path);
         }
     }
 
