@@ -8,14 +8,11 @@
 #include <ctype.h>
 #include "p2bot.h"
 
+static void download_thread_images(FILE *threadp);
+
 int main(int argc, char *argv[])
 {
-    url_t *url;
     FILE *fp;
-    char buf[2048];
-    char *bufp;
-    char outfile[20];
-    int out;
 
     if (argc < 2) {
         fprintf(stderr, "usage: p2bot $thread_file\n");
@@ -27,22 +24,31 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
+    download_thread_images(fp);
+
+    return 0;
+}
+
+static void download_thread_images(FILE *threadp)
+{
+    int out;
+    char outfile[20], buf[2048], *bufp;
+    url_t *url;
+
     out = 0;
-    while (fgets(buf, sizeof(buf), fp) != NULL) {
+    while (fgets(buf, sizeof(buf), threadp) != NULL) {
         bufp = buf;
-        while ((url = getURL(&bufp)) != NULL) {
+        while ((url = get_url(&bufp)) != NULL) {
             sprintf(outfile, "test/%d.jpg", out);
-            fprintf(stdout, "Host: %s, Path: %s\n", url->host, url->path);
+            fprintf(stdout, "Download: %s%s\n", url->host, url->path);
             save_url(url, outfile);
             out++;
             usleep(200000);
         }
     }
-
-    return 0;
 }
 
-url_t *getURL(char **body)
+url_t *get_url(char **body)
 {
     url_t *url;
     char ch, *cs, *ce, *cp;
@@ -113,8 +119,6 @@ char *save_url(url_t *url, char *savefile) {
             length = atoi(p);
         }
     }
-
-    printf("Content-Length: %d\n", length); 
 
     FILE *out;
     int a, i;

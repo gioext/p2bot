@@ -4,7 +4,8 @@
 
 
 
-#define USER_AGENT "Mozilla/5.0 (compatible; p2bot/0.1; +http://p2m.giox.org/)"
+//#define USER_AGENT "Mozilla/5.0 (compatible; p2bot/0.1; +http://p2m.giox.org/)"
+#define USER_AGENT "Mozilla/5.0"
 
 typedef struct {
     char *host;
@@ -18,7 +19,7 @@ int open_connection(char *host, char *service);
 
 
 
-url_t *getURL(char **body);
+url_t *get_url(char **body);
 void *xmalloc(size_t size);
 
 
