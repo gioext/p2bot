@@ -5,38 +5,89 @@
 #include <sys/types.h>
 #include <netdb.h>
 #include <string.h>
-
-#define USER_AGENT "Mozilla/5.0 (compatible; p2bot/0.1; +http://p2m.giox.org/)"
-
-static char *save_url(char *host, char *path, char *savefile);
-static int open_connection(char *host, char *service);
+#include <ctype.h>
+#include "p2bot.h"
 
 int main(int argc, char *argv[])
 {
-    int opt;
-    int header = 0;
+    url_t *url;
+    FILE *fp;
+    char buf[2048];
+    char *bufp;
+    char outfile[20];
+    int out;
 
-    while ((opt = getopt(argc, argv, "s")) != -1) {
-        switch (opt) {
-        case 's':
-            header = 1;
-            break;
+    if (argc < 2) {
+        fprintf(stderr, "usage: p2bot $thread_file\n");
+        exit(1);
+    }
+
+    if ((fp = fopen(argv[1], "r")) == NULL) {
+        fprintf(stderr, "file open error %s\n", "test/thread.txt");
+        exit(1);
+    }
+
+    out = 0;
+    while (fgets(buf, sizeof(buf), fp) != NULL) {
+        bufp = buf;
+        while ((url = getURL(&bufp)) != NULL) {
+            sprintf(outfile, "test/%d.jpg", out);
+            fprintf(stdout, "Host: %s, Path: %s\n", url->host, url->path);
+            save_url(url, outfile);
+            out++;
+            usleep(200000);
         }
     }
-    argc -= optind;
-    argv += optind;
-    save_url(argv[0], argv[1], argv[2]);
-    //usleep(500000);
+
     return 0;
 }
 
-char *save_url(char *host, char *path, char *savefile) {
+url_t *getURL(char **body)
+{
+    url_t *url;
+    char ch, *cs, *ce, *cp;
+    cs = *body;
+
+    /* search url */
+    while((ce = strstr(*body, "//")) != NULL) {
+        ce += 2;
+        cs = ce;
+
+        ch = *ce;
+        while (isalnum(ch) || strchr(".?/=_:-~", ch) != NULL) {
+            ch = *(++ce);
+        }
+        *ce++ = '\0';
+        *body = ce;
+
+        // valid
+        if (strchr(cs, '/') == NULL || strcasestr(cs, ".jpg") == NULL) {
+            fprintf(stderr, "bad image: %s\n", cs);
+            continue;
+        }
+
+        cp = strchr(cs, '/');
+        *cp++ = '\0';
+        
+        url = xmalloc(sizeof(url_t));
+        url->host = xmalloc(strlen(cs) + 1);
+        sprintf(url->host, "%s", cs);
+        url->path = xmalloc(strlen(cp) + 2);
+        sprintf(url->path, "/%s", cp);
+
+        return url;
+    }
+    return NULL;
+}
+
+
+char *save_url(url_t *url, char *savefile) {
     int sock;
     char *p;
     FILE *fin, *fout;
     char buf[1024];
 
-    sock = open_connection(host, "80");
+    sock = open_connection(url->host, "80");
     if (sock < 0) {
         fprintf(stderr, "open_connection failed\n");
         return NULL;
@@ -44,8 +95,8 @@ char *save_url(char *host, char *path, char *savefile) {
     fin = fdopen(sock, "r");
     fout = fdopen(sock, "w");
 
-    fprintf(fout, "GET %s HTTP/1.1\r\n", path);
-    fprintf(fout, "HOST: %s\r\n", host);
+    fprintf(fout, "GET %s HTTP/1.1\r\n", url->path);
+    fprintf(fout, "HOST: %s\r\n", url->host);
     fprintf(fout, "User-Agent: %s\r\n", USER_AGENT);
     fprintf(fout, "Connection: close\r\n");
     fprintf(fout, "\r\n");
@@ -81,8 +132,7 @@ char *save_url(char *host, char *path, char *savefile) {
     return NULL;
 }
 
-static int
-open_connection(char *host, char *service)
+int open_connection(char *host, char *service)
 {
     int sock;
     struct addrinfo hints, *res, *ai;
@@ -110,3 +160,16 @@ open_connection(char *host, char *service)
     freeaddrinfo(res);
     return -2;
 }
+
+void *xmalloc(size_t size)
+{
+    void *p;
+    p = malloc(size);
+    if (!p) {
+        fprintf(stderr, "failed malloc()\n");
+        exit(1);
+    }
+
+    return p;
+}
+
