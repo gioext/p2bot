@@ -1,4 +1,4 @@
 *.out
 p2bot
-p2bot.dSYM
+*.dSYM
 *.jpg
