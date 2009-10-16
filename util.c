@@ -83,6 +83,13 @@ int get_http_socket(char *host)
     return -2;
 }
 
+/*
+ * ex1.) pl-loader.net
+ * url      : http://pl-loader.net/dl.php?la=1365361110.jpg
+ * referer  : http://pl-loader.net/dl.php
+ * image url: http://pl-loader.net/pic/1241318438.jpg
+ *
+ */
 int http_get(url_t *url, FILE **fp)
 {
     int sock;

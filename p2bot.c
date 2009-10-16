@@ -21,7 +21,7 @@ typedef struct {
 void get_board();
 void get_thread(url_t *url);
 url_t *get_url(char **body);
-void save_url(FILE *fp, char *savefile);
+void write_file(FILE *fp, char *savefile);
 static void download_thread_images(url_t *thread_url);
 
 int main(int argc, char *argv[])
@@ -130,7 +130,7 @@ static void download_thread_images(url_t *thread_url)
                 free_url(url);
                 continue;
             }
-            //save_url(ifp, outfile);
+            //write_file(ifp, outfile);
             out++;
             free_url(url);
             fclose(ifp);
@@ -180,7 +180,7 @@ url_t *get_url(char **body)
     return NULL;
 }
 
-void save_url(FILE *fp, char *savefile) {
+void write_file(FILE *fp, char *savefile) {
     int length = 0;
     char buf[1024];
     char *p;
