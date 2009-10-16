@@ -1,51 +1,145 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <netdb.h>
+#include <lua.h>
+#include <lualib.h>
+#include <lauxlib.h>
 #include <string.h>
+#include <unistd.h>
 #include <ctype.h>
-#include "p2bot.h"
+#include "util.h"
 
-static void download_thread_images(FILE *threadp);
+#define CONFIG_FILE "config.lua"
+#define CONFIG_BOARDS_KEY "boards"
+
+typedef struct {
+    int dat_id;
+    char *thread_name;
+    url_t *url;
+} thread_t;
+
+
+void get_board();
+void get_thread(url_t *url);
+url_t *get_url(char **body);
+void save_url(FILE *fp, char *savefile);
+static void download_thread_images(url_t *thread_url);
 
 int main(int argc, char *argv[])
 {
-    FILE *fp;
-
-    if (argc < 2) {
-        fprintf(stderr, "usage: p2bot $thread_file\n");
-        exit(1);
-    }
-
-    if ((fp = fopen(argv[1], "r")) == NULL) {
-        fprintf(stderr, "file open error %s\n", "test/thread.txt");
-        exit(1);
-    }
-
-    download_thread_images(fp);
-
+    get_board();
     return 0;
 }
 
-static void download_thread_images(FILE *threadp)
+void get_board()
 {
-    int out;
-    char outfile[20], buf[2048], *bufp;
+    int i;
+    lua_State *L;
     url_t *url;
 
+    L = luaL_newstate();
+    luaL_openlibs(L);
+    if (luaL_dofile(L, CONFIG_FILE)) {
+        fprintf(stderr, "luaL_dofile()\n");
+        exit(1);
+    }
+    lua_getglobal(L, CONFIG_BOARDS_KEY);
+
+    i = 1;
+    while (1) {
+        lua_rawgeti(L, 1, i++);
+        const char *strurl = lua_tostring(L, -1);
+        if (strurl == NULL) {
+            break;
+        } else {
+            url = strtourl(strurl);
+            get_thread(url);
+            printf("Download board: %s%s\n", url->host, url->path);
+            free_url(url);
+        }
+    }
+    lua_close(L);
+}
+
+void get_thread(url_t *url)
+{
+    int sock;
+    char buf[1024];
+    FILE *fp;
+    char subdir[strlen(url->path)];
+    char thread_url_str[128];
+    strcpy(subdir, url->path);
+    char *subdire = strchr(subdir + 1, '/');
+    *subdire = '\0';
+
+    sock = http_get(url, &fp);
+    if (sock < 0 || fp == NULL) {
+        fprintf(stderr, "http_get()\n");
+        return;
+    }
+
+    int body = 0;
+    while (fgets(buf, sizeof(buf), fp) != NULL) {
+        if (body == 0 && strcmp(buf, "\r\n") == 0) {
+            body = 1;
+            continue;
+        }
+        if (body == 0) continue;
+
+        char *cp;
+        cp = strstr(buf, "<>");
+        if (cp == NULL) {
+            printf("%s\n", cp);
+            continue;
+        }
+        *cp = '\0';
+        cp += 2; // thread name
+
+        sprintf(thread_url_str, "%s%s/dat/%s", url->host, subdir, buf);
+        url_t *thread_url = strtourl(thread_url_str);
+        download_thread_images(thread_url);
+        printf("Download thread: %s%s/dat/%s\n", url->host, subdir, buf);
+        free_url(thread_url);
+    }
+    fclose(fp);
+    close(sock);
+}
+
+static void download_thread_images(url_t *thread_url)
+{
+    int out;
+    int sock;
+    char outfile[20], buf[2048], *bufp;
+    url_t *url;
+    FILE *fp;
+
+    sock = http_get(thread_url, &fp);
+    if (sock < 0) {
+        fprintf(stderr, "http_get()\n");
+    }
     out = 0;
-    while (fgets(buf, sizeof(buf), threadp) != NULL) {
+    while (fgets(buf, sizeof(buf), fp) != NULL) {
         bufp = buf;
         while ((url = get_url(&bufp)) != NULL) {
             sprintf(outfile, "test/%d.jpg", out);
             fprintf(stdout, "Download: %s%s\n", url->host, url->path);
-            save_url(url, outfile);
+
+            FILE *ifp;
+            int is = http_get(url, &ifp);
+            if (is < 0) {
+                fprintf(stderr, "http_get()\n");
+                free_url(url);
+                continue;
+            }
+            //save_url(ifp, outfile);
             out++;
-            usleep(200000);
+            free_url(url);
+            fclose(ifp);
+            close(is);
+            //usleep(500000);
         }
     }
+    fclose(fp);
+    close(sock);
 }
 
 url_t *get_url(char **body)
@@ -68,7 +162,7 @@ url_t *get_url(char **body)
 
         // valid
         if (strchr(cs, '/') == NULL || strcasestr(cs, ".jpg") == NULL) {
-            fprintf(stderr, "bad image: %s\n", cs);
+            //fprintf(stderr, "bad image: %s\n", cs);
             continue;
         }
 
@@ -86,31 +180,13 @@ url_t *get_url(char **body)
     return NULL;
 }
 
-
-char *save_url(url_t *url, char *savefile) {
-    int sock;
-    char *p;
-    FILE *fin, *fout;
-    char buf[1024];
-
-    sock = open_connection(url->host, "80");
-    if (sock < 0) {
-        fprintf(stderr, "open_connection failed\n");
-        return NULL;
-    }
-    fin = fdopen(sock, "r");
-    fout = fdopen(sock, "w");
-
-    fprintf(fout, "GET %s HTTP/1.1\r\n", url->path);
-    fprintf(fout, "HOST: %s\r\n", url->host);
-    fprintf(fout, "User-Agent: %s\r\n", USER_AGENT);
-    fprintf(fout, "Connection: close\r\n");
-    fprintf(fout, "\r\n");
-    fflush(fout);
-
+void save_url(FILE *fp, char *savefile) {
     int length = 0;
+    char buf[1024];
+    char *p;
+
     while (1) {
-        if (fgets(buf, sizeof(buf), fin) == NULL) break;
+        if (fgets(buf, sizeof(buf), fp) == NULL) break;
         if (strcmp(buf, "\r\n") == 0) break;
 
         if (strncasecmp(buf, "content-length:", 15) == 0) {
@@ -125,55 +201,8 @@ char *save_url(url_t *url, char *savefile) {
     out = fopen(savefile, "w");
 
     for (i = 0; i < length; i++) {
-        a = fgetc(fin);
+        a = fgetc(fp);
         fputc(a, out);
     }
-
-    fclose(fin);
-    fclose(fout);
     fclose(out);
-
-    return NULL;
 }
-
-int open_connection(char *host, char *service)
-{
-    int sock;
-    struct addrinfo hints, *res, *ai;
-    int err;
-
-    memset(&hints, 0, sizeof(struct addrinfo));
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_STREAM;
-    if ((err = getaddrinfo(host, service, &hints, &res)) != 0) {
-        return -1;
-    }
-    for (ai = res; ai; ai = ai->ai_next) {
-        sock = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
-        if (sock < 0) {
-            continue;
-        }
-        if (connect(sock, ai->ai_addr, ai->ai_addrlen) < 0) {
-            close(sock);
-            continue;
-        }
-        /* success */
-        freeaddrinfo(res);
-        return sock;
-    }
-    freeaddrinfo(res);
-    return -2;
-}
-
-void *xmalloc(size_t size)
-{
-    void *p;
-    p = malloc(size);
-    if (!p) {
-        fprintf(stderr, "failed malloc()\n");
-        exit(1);
-    }
-
-    return p;
-}
-
