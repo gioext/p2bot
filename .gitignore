@@ -2,3 +2,5 @@
 p2bot
 *.dSYM
 *.jpg
+*.o
+*.bak

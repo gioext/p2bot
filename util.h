@@ -17,9 +17,13 @@ typedef struct {
 } url_t;
 
 void *xmalloc(size_t size);
-int http_get(url_t *url, FILE **fin);
 int get_http_socket(char *host);
 url_t *strtourl(const char *str);
 void free_url(url_t *url);
+
+response_t *get_http_response(url_t *url);
+void free_response(response_t *res);
+
+int read_header(response_t *res);
 
 #endif

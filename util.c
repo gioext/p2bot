@@ -89,30 +89,74 @@ int get_http_socket(char *host)
  * referer  : http://pl-loader.net/dl.php
  * image url: http://pl-loader.net/pic/1241318438.jpg
  *
+ *
+ * ex2.) dotup
  */
-int http_get(url_t *url, FILE **fp)
+response_t *get_http_response(url_t *url)
 {
     int sock;
+    FILE *fp;
 
     sock = get_http_socket(url->host);
     if (sock < 0) {
-        fprintf(stderr, "get_http_socket(). %s %s\n", url->host, url->path);
-        return sock;
+        return NULL;
     }
 
-    *fp = fdopen(sock, "r+");
-    if (*fp == NULL) {
-        fprintf(stderr, "fdopen(). %s %s", url->host, url->path);
+    fp = fdopen(sock, "r+");
+    if (fp == NULL) {
+        close(sock);
+        return NULL;
+    }
+
+    fprintf(fp, "GET %s HTTP/1.1\r\n", url->path);
+    fprintf(fp, "HOST: %s\r\n", url->host);
+    fprintf(fp, "User-Agent: %s\r\n", USER_AGENT);
+    fprintf(fp, "Connection: close\r\n");
+    fprintf(fp, "\r\n");
+    fflush(fp);
+
+    response_t *res;
+    res = xmalloc(sizeof(response_t));
+    res->fp = fp;
+    res->sock = sock;
+    if (read_header(res) < 0) {
+        free(res);
+        close(sock);
+        return NULL;
+    }
+    return res;
+}
+
+int read_header(response_t *res)
+{
+    int length;
+    char buf[1024];
+    char *p;
+
+    if (fgets(buf, sizeof(buf), res->fp) == NULL) {
         return -1;
     }
+    p = strchr(buf, ' ');
+    res->status = atoi(++p);
 
-    fprintf(*fp, "GET %s HTTP/1.1\r\n", url->path);
-    fprintf(*fp, "HOST: %s\r\n", url->host);
-    fprintf(*fp, "User-Agent: %s\r\n", USER_AGENT);
-    fprintf(*fp, "Connection: close\r\n");
-    fprintf(*fp, "\r\n");
-    fflush(*fp);
+    length = 0;
+    while (fgets(buf, sizeof(buf), res->fp) != NULL) {
+        if (strcmp(buf, "\r\n") == 0) break;
 
-    // create response
-    return sock;
+        if (strncasecmp(buf, "content-length:", 15) == 0) {
+            p = buf + 15;
+            length = atoi(p);
+        }
+    }
+    if (length == 0) {
+        return -1;
+    }
+    res->length = length;
+    return 0;
+}
+
+void free_response(response_t *res)
+{
+    close(res->sock);
+    free(res);
 }

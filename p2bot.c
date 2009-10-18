@@ -6,7 +6,9 @@
 #include <string.h>
 #include <unistd.h>
 #include <ctype.h>
+#include <pthread.h>
 #include "util.h"
+#include "gstack.h"
 
 #define CONFIG_FILE "config.lua"
 #define CONFIG_BOARDS_KEY "boards"
@@ -17,24 +19,45 @@ typedef struct {
     url_t *url;
 } thread_t;
 
-
-void get_board();
-void get_thread(url_t *url);
+static void get_board();
+static void get_thread(url_t *url);
 url_t *get_url(char **body);
 void write_file(FILE *fp, char *savefile);
 static void download_thread_images(url_t *thread_url);
 
+gstack_t *boards;
+gstack_t *threads;
+gstack_t *images;
+
 int main(int argc, char *argv[])
 {
+    void *datap;
+    boards = gstack_new();
+    threads = gstack_new();
+    images = gstack_new();
+
     get_board();
+
+    while ((datap = gstack_pop(boards)) != NULL) {
+        get_thread((url_t *)datap);
+        free_url(datap);
+    }
+    gstack_destroy(boards);
+
+    while ((datap = gstack_pop(threads)) != NULL) {
+        url_t *url = (url_t *)datap;
+        printf("%s%s\n", url->host, url->path);
+        free_url(url);
+    }
+    gstack_destroy(threads);
+
     return 0;
 }
 
-void get_board()
+static void get_board()
 {
-    int i;
+    int i = 1;
     lua_State *L;
-    url_t *url;
 
     L = luaL_newstate();
     luaL_openlibs(L);
@@ -43,48 +66,35 @@ void get_board()
         exit(1);
     }
     lua_getglobal(L, CONFIG_BOARDS_KEY);
-
-    i = 1;
     while (1) {
         lua_rawgeti(L, 1, i++);
         const char *strurl = lua_tostring(L, -1);
         if (strurl == NULL) {
             break;
         } else {
-            url = strtourl(strurl);
-            get_thread(url);
-            printf("Download board: %s%s\n", url->host, url->path);
-            free_url(url);
+            gstack_push(boards, (void *)strtourl(strurl));
         }
     }
     lua_close(L);
 }
 
-void get_thread(url_t *url)
+static void get_thread(url_t *url)
 {
-    int sock;
+    response_t *res;
     char buf[1024];
-    FILE *fp;
     char subdir[strlen(url->path)];
     char thread_url_str[128];
     strcpy(subdir, url->path);
     char *subdire = strchr(subdir + 1, '/');
     *subdire = '\0';
 
-    sock = http_get(url, &fp);
-    if (sock < 0 || fp == NULL) {
-        fprintf(stderr, "http_get()\n");
+    res = get_http_response(url);
+    if (res == NULL) {
+        fprintf(stderr, "board#get_http_respnse()\n");
+        gstack_destroy(threads);
         return;
     }
-
-    int body = 0;
-    while (fgets(buf, sizeof(buf), fp) != NULL) {
-        if (body == 0 && strcmp(buf, "\r\n") == 0) {
-            body = 1;
-            continue;
-        }
-        if (body == 0) continue;
-
+    while (fgets(buf, sizeof(buf), res->fp) != NULL) {
         char *cp;
         cp = strstr(buf, "<>");
         if (cp == NULL) {
@@ -95,51 +105,56 @@ void get_thread(url_t *url)
         cp += 2; // thread name
 
         sprintf(thread_url_str, "%s%s/dat/%s", url->host, subdir, buf);
-        url_t *thread_url = strtourl(thread_url_str);
-        download_thread_images(thread_url);
-        printf("Download thread: %s%s/dat/%s\n", url->host, subdir, buf);
-        free_url(thread_url);
+        gstack_push(threads, (void *)strtourl(thread_url_str));
     }
-    fclose(fp);
-    close(sock);
+    free_response(res);
+//
+//    while ((datap = gstack_pop(threads)) != NULL) {
+//        //download_thread_images((url_t *)datap);
+//        free_url(datap);
+//    }
 }
 
+/*
+ * todo user dat_t
+ */
 static void download_thread_images(url_t *thread_url)
 {
     int out;
-    int sock;
     char outfile[20], buf[2048], *bufp;
     url_t *url;
-    FILE *fp;
+    response_t *res, *res_image;
 
-    sock = http_get(thread_url, &fp);
-    if (sock < 0) {
-        fprintf(stderr, "http_get()\n");
+    res = get_http_response(thread_url);
+    if (res == NULL) {
+        fprintf(stderr, "thread#get_http_response()\n");
+        return;
     }
     out = 0;
-    while (fgets(buf, sizeof(buf), fp) != NULL) {
+    while (fgets(buf, sizeof(buf), res->fp) != NULL) {
         bufp = buf;
         while ((url = get_url(&bufp)) != NULL) {
             sprintf(outfile, "test/%d.jpg", out);
-            fprintf(stdout, "Download: %s%s\n", url->host, url->path);
 
-            FILE *ifp;
-            int is = http_get(url, &ifp);
-            if (is < 0) {
-                fprintf(stderr, "http_get()\n");
+            res_image = get_http_response(url);
+            if (res_image == NULL) {
+                fprintf(stderr, "image#get_http_response(). %s%s\n", url->host, url->path);
                 free_url(url);
                 continue;
             }
-            //write_file(ifp, outfile);
-            out++;
+            if (res_image->status >= 200 && res_image->status < 300) {
+                fprintf(stdout, "Image: %s%s\n", url->host, url->path);
+                //write_file(ifp, outfile);
+                out++;
+                usleep(500000);
+            } else {
+                fprintf(stderr, "Bad status %s%s\n", url->host, url->path);
+            }
             free_url(url);
-            fclose(ifp);
-            close(is);
-            //usleep(500000);
+            free_response(res_image);
         }
     }
-    fclose(fp);
-    close(sock);
+    free_response(res);
 }
 
 url_t *get_url(char **body)
