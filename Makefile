@@ -8,5 +8,5 @@ p2bot: p2bot.c util.o gstack.o
 util.o: util.c util.h
 	gcc -c ${CFLAG} util.c
 
-stack.o: gstack.c gstack.h
+gstack.o: gstack.c gstack.h
 	gcc -c ${CFLAG} gstack.c

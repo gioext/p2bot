@@ -68,18 +68,18 @@ void *gstack_pop(gstack_t *stack)
     return datap;
 }
 
-void *run(void *arg)
-{
-    gstack_node_t *datap;
-    gstack_t *stack;
-    stack = (gstack_t *)arg;
-
-    while((datap = gstack_pop(stack)) != NULL) {
-        int i = (int)datap;
-        printf("%u: %d\n", pthread_self(), i);
-    }
-    return NULL;
-}
+//void *run(void *arg)
+//{
+//    gstack_node_t *datap;
+//    gstack_t *stack;
+//    stack = (gstack_t *)arg;
+//
+//    while((datap = gstack_pop(stack)) != NULL) {
+//        int i = (int)datap;
+//        printf("%u: %d\n", pthread_self(), i);
+//    }
+//    return NULL;
+//}
 
 //int main(int argc, char *argv[])
 //{

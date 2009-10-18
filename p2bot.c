@@ -21,6 +21,7 @@ typedef struct {
 
 static void get_board();
 static void get_thread(url_t *url);
+static void get_image(url_t *url);
 url_t *get_url(char **body);
 void write_file(FILE *fp, char *savefile);
 static void download_thread_images(url_t *thread_url);
@@ -45,11 +46,17 @@ int main(int argc, char *argv[])
     gstack_destroy(boards);
 
     while ((datap = gstack_pop(threads)) != NULL) {
+        get_image((url_t *)datap);
+        free_url(datap);
+    }
+    gstack_destroy(threads);
+
+    while ((datap = gstack_pop(images)) != NULL) {
         url_t *url = (url_t *)datap;
         printf("%s%s\n", url->host, url->path);
         free_url(url);
     }
-    gstack_destroy(threads);
+    gstack_destroy(images);
 
     return 0;
 }
@@ -91,7 +98,6 @@ static void get_thread(url_t *url)
     res = get_http_response(url);
     if (res == NULL) {
         fprintf(stderr, "board#get_http_respnse()\n");
-        gstack_destroy(threads);
         return;
     }
     while (fgets(buf, sizeof(buf), res->fp) != NULL) {
@@ -113,6 +119,26 @@ static void get_thread(url_t *url)
 //        //download_thread_images((url_t *)datap);
 //        free_url(datap);
 //    }
+}
+
+static void get_image(url_t *thread)
+{
+    char buf[2048], *bufp;
+    url_t *url;
+    response_t *res;
+
+    res = get_http_response(thread);
+    if (res == NULL) {
+        fprintf(stderr, "thread#get_http_response()\n");
+        return;
+    }
+    while (fgets(buf, sizeof(buf), res->fp) != NULL) {
+        bufp = buf;
+        while ((url = get_url(&bufp)) != NULL) {
+            gstack_push(images, url);
+        }
+    }
+    free_response(res);
 }
 
 /*
