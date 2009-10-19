@@ -11,6 +11,7 @@ typedef struct gstack {
     int length;
     gstack_node_t *head;
     pthread_mutex_t mutex;
+    pthread_cond_t cond;
 } gstack_t;
 
 gstack_t *gstack_new();

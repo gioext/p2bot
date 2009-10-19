@@ -1,6 +1,6 @@
 CFLAG = -g -Wall -O2 -m32
 INCLUDE = -I/opt/local/include
-LIB = -L/opt/local/lib -llua
+LIB = -L/opt/local/lib
 
 p2bot: p2bot.c util.o gstack.o
 	gcc ${CFLAG} ${INCLUDE} ${LIB} -o $@ p2bot.c util.o gstack.o

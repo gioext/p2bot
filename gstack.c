@@ -14,7 +14,10 @@ gstack_t *gstack_new()
     stack->length = 0;
     stack->head = NULL;
     if (pthread_mutex_init(&(stack->mutex), NULL) < 0) {
-        fprintf(stderr, "error\n");
+        fprintf(stderr, "mutex_init error\n");
+    }
+    if (pthread_cond_init(&(stack->cond), NULL) < 0) {
+        fprintf(stderr, "cond_init error\n");
     }
 
     return stack;
@@ -23,6 +26,7 @@ gstack_t *gstack_new()
 void gstack_destroy(gstack_t *stack)
 {
     pthread_mutex_destroy(&(stack->mutex));
+    pthread_cond_destroy(&(stack->cond));
     free(stack);
 }
 
@@ -38,8 +42,10 @@ int gstack_push(gstack_t *stack, void *datap)
     node->datap = datap;
 
     pthread_mutex_lock(&(stack->mutex));
-    if (stack->head != NULL) {
+    if (stack->length > 0) {
         node->nextp = stack->head;
+    } else {
+        pthread_cond_signal(&(stack->cond));
     }
     stack->head = node;
     stack->length++;
@@ -53,11 +59,11 @@ void *gstack_pop(gstack_t *stack)
     gstack_node_t *node;
     void *datap;
 
-    if (stack->head == NULL) {
-        return NULL;
+    pthread_mutex_lock(&(stack->mutex));
+    while (stack->length == 0) {
+        pthread_cond_wait(&(stack->cond), &(stack->mutex));
     }
 
-    pthread_mutex_lock(&(stack->mutex));
     node = stack->head;
     datap = node->datap;
     stack->head = node->nextp;
