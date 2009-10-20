@@ -9,6 +9,7 @@ typedef struct gstack_node {
 
 typedef struct gstack {
     int length;
+    int wait;
     gstack_node_t *head;
     pthread_mutex_t mutex;
     pthread_cond_t cond;

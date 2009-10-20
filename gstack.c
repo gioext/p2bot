@@ -12,6 +12,7 @@ gstack_t *gstack_new()
         return NULL;
     }
     stack->length = 0;
+    stack->wait = 0;
     stack->head = NULL;
     if (pthread_mutex_init(&(stack->mutex), NULL) < 0) {
         fprintf(stderr, "mutex_init error\n");
@@ -61,6 +62,7 @@ void *gstack_pop(gstack_t *stack)
 
     pthread_mutex_lock(&(stack->mutex));
     while (stack->length == 0) {
+        stack->wait = 1;
         pthread_cond_wait(&(stack->cond), &(stack->mutex));
     }
 
@@ -68,6 +70,7 @@ void *gstack_pop(gstack_t *stack)
     datap = node->datap;
     stack->head = node->nextp;
     stack->length--;
+    stack->wait = 0;
     free(node);
     pthread_mutex_unlock(&(stack->mutex));
 
