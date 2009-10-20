@@ -157,6 +157,7 @@ int read_header(response_t *res)
 
 void free_response(response_t *res)
 {
+    fclose(res->fp);
     close(res->sock);
     free(res);
 }

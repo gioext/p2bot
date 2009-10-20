@@ -30,9 +30,8 @@ gstack_t *images;
 
 int main(int argc, char *argv[])
 {
-    void *datap;
     url_t *url;
-    pthread_t th_thread[3], th_image[3];
+    pthread_t th_thread[2], th_image[2];
 
     boards = gstack_new();
     threads = gstack_new();
@@ -41,26 +40,23 @@ int main(int argc, char *argv[])
     // start worker thread
     pthread_create(&th_thread[0], NULL, run_parse_threads, NULL);
     pthread_create(&th_thread[1], NULL, run_parse_threads, NULL);
-    pthread_create(&th_thread[2], NULL, run_parse_threads, NULL);
     pthread_create(&th_image[0], NULL, run_download_images, NULL);
     pthread_create(&th_image[1], NULL, run_download_images, NULL);
-    pthread_create(&th_image[2], NULL, run_download_images, NULL);
 
-    get_boards();
-
-    while ((datap = gstack_pop(boards)) != NULL) {
-        url = (url_t *)datap;
-        get_threads(url);
-        printf("%s%s\n", url->host, url->path);
-        free_url(url);
+    while (1) {
+        get_boards();
+        while (boards->length != 0) {
+            url = (url_t *)gstack_pop(boards);
+            get_threads(url);
+            printf("%s%s\n", url->host, url->path);
+            free_url(url);
+        }
+        while (threads->length != 0 || images->length != 0) {
+            printf("%d %d\n", threads->length, images->length);
+            sleep(10);
+        }
+        //sleep(600);
     }
-
-    pthread_detach(th_thread[0]);
-    pthread_detach(th_thread[1]);
-    pthread_detach(th_thread[2]);
-    pthread_detach(th_image[0]);
-    pthread_detach(th_image[1]);
-    pthread_detach(th_image[2]);
 
     return 0;
 }
@@ -74,7 +70,7 @@ static void *run_parse_threads(void *arg)
         get_images(url);
         printf("%s%s\n", url->host, url->path);
         free_url(url);
-        usleep(500000);
+        usleep(200000);
     }
 
     return NULL;
@@ -89,7 +85,7 @@ static void *run_download_images(void *arg)
         //download_image(url);
         printf("%s%s\n", url->host, url->path);
         free_url(url);
-        usleep(500000);
+        usleep(200000);
     }
 
     return NULL;
@@ -108,6 +104,7 @@ static void get_boards()
         }
         gstack_push(boards, (void *)strtourl(buf));
     }
+    fclose(fp);
 }
 
 static void get_threads(url_t *url)
@@ -127,16 +124,15 @@ static void get_threads(url_t *url)
     }
     while (fgets(buf, sizeof(buf), res->fp) != NULL) {
         char *cp;
-        cp = strstr(buf, "<>");
+        cp = strchr(buf, '.');
         if (cp == NULL) {
             continue;
         }
         *cp = '\0';
-        cp += 2; // thread name
+        cp += 6; // thread name
 
-        sprintf(thread_url_str, "%s%s/dat/%s", url->host, subdir, buf);
+        sprintf(thread_url_str, "http://bg20.2ch.net/test/r.so/%s%s/%s/", url->host, subdir, buf);
         gstack_push(threads, (void *)strtourl(thread_url_str));
-        printf("%s\n", thread_url_str);
     }
     free_response(res);
 }
