@@ -1,7 +1,6 @@
 local http = require("socket.http")
 local ltn12 = require("ltn12")
 local io = require("io")
-local util = require("util")
 
 server = "yutori7.2ch.net/news4vip"
 
@@ -34,7 +33,7 @@ function get_images(dat)
     local html = http_get(dat['url'])
     for image in string.gmatch(html, "//([%w%d%%%.-^~=?/_:]+%.jpg)") do
         print(image)
-        util.usleep(200000)
+        usleep(200000)
     end
 end
 

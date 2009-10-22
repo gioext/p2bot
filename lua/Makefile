@@ -1,2 +1,5 @@
+p2bot: p2bot.c
+	gcc -Wall -m32 -O2 -I/opt/local/include -L/opt/local/lib -llua -o p2bot p2bot.c
+
 util.so: util.c
-	 gcc -I/opt/local/include -L/opt/local/lib -O2 -o util.so -shared util.c -llua
+	 gcc -Wall -m32 -O2 -shared -fPIC -I/opt/local/include -L/opt/local/lib -llua -o util.so util.c -llua
