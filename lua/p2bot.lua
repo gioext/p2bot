@@ -16,25 +16,35 @@ function http_get(url, headers)
         headers = headers,
         redirect = true
     }
-    return table.concat(body)
+    return table.concat(body), s, h
 end
 
 function get_dats()
     local subject = http_get("http://" .. server .. "/subject.txt", { referer = "http://www.google.co.jp/" }) 
     local dats = {}
     for k, v in string.gmatch(subject, "(.-).dat<>(.-)\n") do
-        table.insert(dats, { id = k, url = "http://bg20.2ch.net/test/r.so/" .. server .. "/" .. k .. "/", name = v })
-        -- dats[k] = { url = server .. "/dat/" .. k .. ".dat", name = v };
+        -- table.insert(dats, { id = k, url = "http://bg20.2ch.net/test/r.so/" .. server .. "/" .. k .. "/", name = v })
+        table.insert(dats, { id = k, url = "http://" .. server .. "/dat/" .. k .. ".dat", name = v });
     end
     return dats;
 end
 
+-- If-Modified-Since: Fri, 23 Oct 2009 09:37:06 GMT
+-- Range: bytes= 86641-
+-- 206 Partial Content
+-- 304 Not Modified
 function get_images(dat)
-    local html = http_get(dat['url'])
-    for image in string.gmatch(html, "//([%w%d%%%.-^~=?/_:]+%.jpg)") do
-        print(image)
-        usleep(200000)
-    end
+    -- read DB
+    local html, status, header = http_get(dat['url'])
+    -- write DB
+    print(header['last-modified'])
+    print(header['content-length'])
+    print(status)
+    print(dat['url'])
+    --for image in string.gmatch(html, "//([%w%d%%%.-^~=?/_:]+%.jpg)") do
+    --    print(dat['id'] .. ':' .. image)
+    --    usleep(200000)
+    --end
 end
 
 dats = get_dats()
