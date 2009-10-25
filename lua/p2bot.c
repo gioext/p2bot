@@ -5,7 +5,16 @@
 #include <lualib.h>
 #include <lauxlib.h>
 
+int lsleep(lua_State *L);
 int lusleep(lua_State *L);
+
+int lsleep(lua_State *L)
+{
+    int seconds;
+    seconds = lua_tonumber(L, 1);
+    sleep(seconds);
+    return 1;
+}
 
 int lusleep(lua_State *L)
 {
@@ -33,11 +42,15 @@ int main(int argc, char *argv[])
     L = lua_open();
     luaL_openlibs(L);
 
+    lua_register(L, "sleep", lsleep);
     lua_register(L, "usleep", lusleep);
 
-    if (luaL_dofile(L, "p2bot.lua")) {
-        fprintf(stderr, "p2bot.lua: load error\n");
-        return 1;
+    while (1) {
+        if (luaL_dofile(L, "p2bot.lua")) {
+            fprintf(stderr, "p2bot.lua: load error\n");
+            // write log
+        }
+        sleep(300);
     }
 
     lua_close(L);
