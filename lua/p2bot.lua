@@ -62,13 +62,13 @@ end
 
 -- pl-loader
 function download_image(url, outfile)
-    local f = io.open(outfile, "w")
-    local data, status, header = http_get(url)
+    print(url)
+    local data, status, header = http_get("http://" .. url)
     if (status == 200 and header['content-type'] == 'image/jpeg') then
-        print(url)
+        local f = io.open(outfile, "w")
         f:write(data)
+        f:close()
     end
-    f:close()
 end
 
 -- If-Modified-Since: Fri, 23 Oct 2009 09:37:06 GMT
@@ -104,10 +104,10 @@ end
 server = "yutori7.2ch.net/news4vip"
 socket.http.USERAGENT = "Mozilla/5.0 (compatible; p2bot/0.1; +http://p2m.giox.org/)"
 -- http.USERAGENT = "Mozilla/5.0"
---db = p2db.new()
---dats = get_dats()
---for k, v in pairs(dats) do
---    get_thread(v)
---    collectgarbage("collect")
---    sleep(1)
---end
+db = p2db.new()
+dats = get_dats()
+for k, v in pairs(dats) do
+    get_thread(v)
+    collectgarbage("collect")
+    sleep(1)
+end
