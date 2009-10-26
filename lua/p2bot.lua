@@ -22,6 +22,7 @@ function p2db_get(id)
     data['num'] = num
     data['modified'] = modified
     data['length'] = length
+    f:close()
     return data
 end
 
@@ -91,7 +92,7 @@ function get_thread(dat)
         for image in string.gmatch(html, "//([%w%d%%%.-^~=?/_:]+%.jpg)") do
             download_image(image, 'images/' .. dat['id'] .. '-' .. num ..'.jpg')
             num = num + 1
-            usleep(200000)
+            usleep(500000)
         end
         local length = header['content-length']
         if data then
