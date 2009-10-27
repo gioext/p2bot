@@ -35,13 +35,13 @@ class HTTP
     return nil unless $1 == "200"
     header = read_header(s)
     open(outfile, "w") do |f|
-      while (buf = s.read(1024))
-        f.write(buf)  
+      while (data = s.read(1024))
+        f.write(data)  
       end
     end
     s.close
   rescue
-    p url
+    p "error" + url
   end
 
   def read_header(socket)

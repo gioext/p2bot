@@ -64,12 +64,12 @@ end
 -- pl-loader
 function download_image(url, outfile)
     print(url)
-    local data, status, header = http_get("http://" .. url)
-    if (status == 200 and header['content-type'] == 'image/jpeg') then
-        local f = io.open(outfile, "w")
-        f:write(data)
-        f:close()
-    end
+    --local data, status, header = http_get("http://" .. url)
+    --if (status == 200 and header['content-type'] == 'image/jpeg') then
+    --    local f = io.open(outfile, "w")
+    --    f:write(data)
+    --    f:close()
+    --end
 end
 
 -- If-Modified-Since: Fri, 23 Oct 2009 09:37:06 GMT
